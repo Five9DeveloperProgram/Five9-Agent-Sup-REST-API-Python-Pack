@@ -1,5 +1,5 @@
 ### README Status:
-This Readme is somewhat under construction.  If you identify incorrect or missing information, please submit a pull request or open an issue.
+This Readme is somewhat under construction.  If you identify incorrect or missing information, please submit a pull request or open an issue.  Forked from [Andrew Willey](https://github.com/andrewawilley)
 
 # Overview
 
@@ -35,7 +35,7 @@ Clone the repository to your local machine, create a virtual environment, and in
 
 ### Windows
 ```powershell
-git clone https://github.com/andrewawilley/Five9-Agent-Sup-REST-API-Python-Pack.git
+git clone https://github.com/Five9DeveloperProgram/Five9-Agent-Sup-REST-API-Python-Pack.git
 cd Five9-Agent-Sup-REST-API-Python-Pack
 python -m venv venvs\main
 .\venvs\main\Scripts\activate
@@ -43,9 +43,9 @@ pip install .
 ```
 ### Linux/MacOS
 ```bash
-git clone https://github.com/andrewawilley/Five9-Agent-Sup-REST-API-Python-Pack.git
+git clone https://github.com/Five9DeveloperProgram/Five9-Agent-Sup-REST-API-Python-Pack.git
 cd Five9-Agent-Sup-REST-API-Python-Pack
-python3 -m venv venvs/main
+python -m venv venvs/main
 source venvs/main/bin/activate
 pip install .
 ```
