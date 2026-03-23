@@ -35,6 +35,12 @@ class MaintenanceNoticeAccept(AgentRestMethod):
     
 
 class AgentLoginState(AgentRestMethod):
+    """Returns the current login state of the agent.
+    GET /agents/{agentId}/login_state
+
+    Common return values: ``"SELECT_STATION"``, ``"ACCEPT_NOTICE"``, ``"WORKING"``.
+    """
+
     method_name = "Agent:AgentLoginState"
 
     def invoke(self):

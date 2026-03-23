@@ -32,6 +32,11 @@ class MaintenanceNoticeAccept(SupervisorRestMethod):
 
 
 class SupervisorLoginState(SupervisorRestMethod):
+    """Returns the current login state of the supervisor.
+    GET /supervisors/{supervisorId}/login_state
+
+    Common return values: ``"SELECT_STATION"``, ``"ACCEPT_NOTICE"``, ``"WORKING"``.
+    """
 
     def invoke(self):
         self.method = "GET"
@@ -111,6 +116,10 @@ class MigrateToMaintenanceHost:
 
 #### Alerts
 class GetAlerts(SupervisorRestMethod):
+    """Returns all configured queue alerts for the domain.
+    GET /alerts
+    """
+
     def invoke(self):
         self.method = "GET"
         self.path = "/alerts"
@@ -118,6 +127,13 @@ class GetAlerts(SupervisorRestMethod):
         return self.response.json()
     
 class CreateAlert(SupervisorRestMethod):
+    """Creates a new queue alert.
+    POST /alerts
+
+    Args:
+        alert_data (dict): Alert configuration payload.
+    """
+
     def invoke(self, alert_data):
         self.method = "POST"
         self.path = "/alerts"
@@ -125,6 +141,14 @@ class CreateAlert(SupervisorRestMethod):
         return self.response.json()
     
 class UpdateAlert(SupervisorRestMethod):
+    """Updates an existing queue alert.
+    PUT /alerts/{alertId}
+
+    Args:
+        alert_id: ID of the alert to update.
+        alert_data (dict): Updated alert configuration payload.
+    """
+
     def invoke(self, alert_id, alert_data):
         self.method = "PUT"
         self.path = f"/alerts/{alert_id}"
@@ -133,6 +157,13 @@ class UpdateAlert(SupervisorRestMethod):
 
 
 class DeleteAlert(SupervisorRestMethod):
+    """Deletes a queue alert by ID.
+    DELETE /alerts/{alertId}
+
+    Args:
+        alert_id: ID of the alert to delete.
+    """
+
     def invoke(self, alert_id):
         self.method = "DELETE"
         self.path = f"/alerts/{alert_id}"
@@ -141,6 +172,13 @@ class DeleteAlert(SupervisorRestMethod):
 
 
 class GetAlertByID(SupervisorRestMethod):
+    """Returns a single queue alert by ID.
+    GET /alerts/{alertId}
+
+    Args:
+        alert_id: ID of the alert to retrieve.
+    """
+
     def invoke(self, alert_id):
         self.method = "GET"
         self.path = f"/alerts/{alert_id}"
@@ -149,6 +187,10 @@ class GetAlertByID(SupervisorRestMethod):
 
 
 class GetDomainDispositions(SupervisorRestMethod):
+    """Returns all call dispositions configured for the domain.
+    GET /orgs/{orgId}/dispositions
+    """
+
     def invoke(self):
         self.method = "GET"
         self.path = f"/orgs/{self.config.orgId}/dispositions"

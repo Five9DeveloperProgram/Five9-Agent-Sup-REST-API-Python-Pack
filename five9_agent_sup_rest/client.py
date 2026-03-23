@@ -30,6 +30,20 @@ API_METHOD_MODULES = {
 
 
 class Five9RestClientSessionConfig:
+    """
+    Holds session credentials and API endpoint URLs derived from the Five9 login
+    response. Implements the Observable side of the Observer pattern.
+
+    The problem this solves: each REST method object caches a reference to this
+    config and reads `base_api_url` and `api_header` (which contains the bearer
+    token) at call time. When the session is re-authenticated — e.g. after a
+    token expiry — those values change. Rather than requiring callers to
+    reinstantiate every method object, this class maintains a list of observer
+    objects (the method instances) and notifies them all via `update_config`
+    whenever new session metadata is processed. This keeps every method object
+    automatically in sync with the latest credentials.
+    """
+
     def __init__(self, *args, **kwargs):
         self.observers = []
 
@@ -52,6 +66,11 @@ class Five9RestClientSessionConfig:
         self.login()
 
     def login(self, *args, **kwargs):
+        """Authenticate against the Five9 login endpoint and process the session.
+
+        Stores cookies and calls process_session_metadata on success.
+        Returns True if metadata was received, False otherwise.
+        """
         self.session_metadata = None
 
         login_request = requests.post(self.login_url, json=self.login_payload)
@@ -115,15 +134,65 @@ class Five9RestClientSessionConfig:
         )
 
     def subscribe_observer(self, observer):
+        """Register an observer to be notified when session metadata is refreshed.
+
+        Called automatically by `FiveNineRestMethod.update_config` so that
+        every method instance is kept up to date after a re-login.
+        """
         self.observers.append(observer)
 
     def notify_observers(self, *args, **kwargs):
+        """Push the updated config to all registered observers.
+
+        Called at the end of `process_session_metadata` so that every
+        registered REST method object receives the new base URL, auth header,
+        and other session-derived values immediately after a login or re-login.
+        """
         for observer in self.observers:
             observer.update_config(self)
 
 
 class Five9RestClient:
+    """Main entry point for interacting with the Five9 Agent/Supervisor REST API.
+
+    Exposes two namespaces populated with all available API methods:
+      - ``client.agent``      — Agent REST API methods
+      - ``client.supervisor`` — Supervisor REST API methods
+
+    After construction, call :meth:`initialize_supervisor_session` or
+    :meth:`initialize_agent_session` to complete the login flow and open a
+    WebSocket for real-time events.
+
+    Args:
+        username (str): Five9 agent or supervisor username.
+        password (str): Corresponding Five9 password.
+        stationId (str, optional): Station ID to register on session start.
+            Defaults to ``""`` (no station).
+        stationType (str, optional): Station type (e.g. ``"GATEWAY"``).
+            Defaults to ``"EMPTY"``.
+        stationState (str, optional): Initial station state.
+            Defaults to ``"DISCONNECTED"``.
+        custom_supervisor_methods (list, optional): Additional
+            :class:`~five9_agent_sup_rest.methods.base.SupervisorRestMethod`
+            subclasses to attach to ``client.supervisor``.
+        custom_agent_methods (list, optional): Additional
+            :class:`~five9_agent_sup_rest.methods.base.AgentRestMethod`
+            subclasses to attach to ``client.agent``.
+        custom_socket_handlers (list, optional): Additional
+            :class:`~five9_agent_sup_rest.methods.default_socket_handlers.SocketEventHandler`
+            subclasses to register on the WebSocket connection.
+        socket_app_key (str, optional): Arbitrary identifier used in the
+            WebSocket URI. Defaults to ``"python_pack_socket"``.
+    """
+
     class RESTNamespace:
+        """Dynamic namespace whose attributes are instantiated REST method objects.
+
+        Built at client construction time by inspecting the given module for all
+        subclasses of the expected base class and attaching an instance of each
+        as an attribute named after the class.
+        """
+
         def __init__(
             self, target_module, session_configuration: Five9RestClientSessionConfig
         ):
@@ -175,6 +244,16 @@ class Five9RestClient:
         self.extensions = {}
 
     def accept_maintenance_notices(self, user_type="supervisor"):
+        """Fetch and accept any pending maintenance notices for the given user type.
+
+        Five9 requires that outstanding maintenance notices are acknowledged
+        before a session can reach the WORKING state.  ``initialize_supervisor_session``
+        and ``initialize_agent_session`` call this automatically when
+        ``auto_accept_notice=True``.
+
+        Args:
+            user_type (str): ``"supervisor"`` or ``"agent"``.
+        """
         if user_type == "supervisor":
             logging.info(f"Accepting Maintenance Notice for Supervisor: {self.session_configuration.userId}")
             notices = self.supervisor.MaintenanceNoticesGet.invoke()
@@ -194,6 +273,25 @@ class Five9RestClient:
     def initialize_supervisor_session(
         self, socket_handlers={}, auto_accept_notice=True
     ):
+        """Complete the supervisor login flow and open a WebSocket connection.
+
+        Handles all intermediate login states automatically:
+          - ``SELECT_STATION`` → calls SupervisorSessionStart, then opens the socket.
+          - ``ACCEPT_NOTICE``  → accepts maintenance notices (if auto_accept_notice),
+            then continues.
+          - ``WORKING``        → session already active, opens the socket directly.
+
+        Args:
+            socket_handlers (dict, optional): Additional event handlers to register
+                on the socket beyond the built-in defaults.
+            auto_accept_notice (bool): Whether to automatically accept pending
+                maintenance notices. Defaults to True.
+
+        Returns:
+            True on success, False if a duplicate-login conflict was detected
+            (the conflicting session is logged out automatically; the caller
+            should retry).
+        """
         current_supervisor_login_state = self.supervisor_login_state
         logging.debug(f"\n\nCurrent Supervisor Login State: {current_supervisor_login_state}")
 
@@ -234,6 +332,20 @@ class Five9RestClient:
             return True
 
     def initialize_agent_session(self, auto_accept_notice=True):
+        """Complete the agent login flow and open a WebSocket connection.
+
+        Mirrors :meth:`initialize_supervisor_session` for the agent context.
+        Handles SELECT_STATION, ACCEPT_NOTICE, and WORKING states.
+
+        Args:
+            auto_accept_notice (bool): Whether to automatically accept pending
+                maintenance notices. Defaults to True.
+
+        Returns:
+            True on success, False if a duplicate-login conflict was detected
+            (the conflicting session is logged out automatically; the caller
+            should retry).
+        """
            
         current_agent_login_state = self.agent_login_state
 
@@ -268,17 +380,39 @@ class Five9RestClient:
 
     @property
     def supervisor_login_state(self):
+        """Current supervisor login state string from the Five9 API.
+
+        Common values: ``"SELECT_STATION"``, ``"ACCEPT_NOTICE"``, ``"WORKING"``.
+        """
         return self.supervisor.SupervisorLoginState.invoke()
 
     @property
     def agent_login_state(self):
+        """Current agent login state string from the Five9 API.
+
+        Common values: ``"SELECT_STATION"``, ``"ACCEPT_NOTICE"``, ``"WORKING"``.
+        """
         return self.agent.AgentLoginState.invoke()
 
 
 class Five9Socket:
-    """Class for facilitating Five9 WebSocket connections
-    Requires a Five9RestClient instance and a socket_app_key.  The socket_app_key is used to identify the socket for your app and is arbitrary.
-    The context parameter must be either "agent" or "supervisor" and is used to determine the context path for the WebSocket URI.
+    """Manages a Five9 WebSocket connection for real-time event streaming.
+
+    Handles the full connection lifecycle: authentication headers, registering
+    event handlers, sending keep-alive pings every 15 seconds, dispatching
+    incoming events to the appropriate handler, and clean disconnection.
+
+    Event handlers are subclasses of
+    :class:`~five9_agent_sup_rest.methods.default_socket_handlers.SocketEventHandler`
+    keyed by their ``eventId``.  Built-in handlers are registered automatically;
+    additional handlers can be passed via ``custom_socket_handlers`` on
+    :class:`Five9RestClient`.
+
+    Args:
+        client (Five9RestClient): The parent client instance.
+        context (str): ``"agent"`` or ``"supervisor"`` — selects the correct
+            WebSocket URI path.
+        socket_app_key (str): Arbitrary identifier embedded in the WebSocket URI.
     """
 
     def __init__(self, client: Five9RestClient, context, socket_app_key):
@@ -294,6 +428,15 @@ class Five9Socket:
         logging.debug(f"WebSocket URI: {self.uri}")
 
     def add_socket_handler(self, handler):
+        """Register a custom event handler on this socket.
+
+        The handler must be a subclass of :class:`SocketEventHandler` and have
+        an ``eventId`` class attribute.  If these conditions are not met the
+        handler is silently skipped.
+
+        Args:
+            handler: A :class:`SocketEventHandler` subclass (not an instance).
+        """
         if (
             inspect.isclass(handler)
             and issubclass(handler, default_socket_handlers.SocketEventHandler)
@@ -401,12 +544,19 @@ class Five9Socket:
             )
 
     def connect(self):
+        """Open the WebSocket connection and block until it is closed.
+
+        Runs the async event loop synchronously.  This call blocks the calling
+        thread until the user presses Enter (via the stdin disconnect listener)
+        or an unrecoverable error occurs.
+        """
         try:
             asyncio.run(self._connect())
         except:
             logging.exception("Error in WebSocket connection.")
 
     async def close(self):
+        """Gracefully close the WebSocket connection if it is currently open."""
         if hasattr(self, "websocket") and self.websocket and self.websocket.open:
             await self.websocket.close()
             logging.info("WebSocket closed.")

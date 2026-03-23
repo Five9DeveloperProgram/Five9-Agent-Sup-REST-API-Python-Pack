@@ -7,17 +7,47 @@ from five9_agent_sup_rest.config import CONTEXT_PATHS
 
 
 class FiveNineRestMethod:
-    # """Base class for all Five9 REST methods.
+    """Base class for all Five9 REST API methods.
+
+    Subclasses must define:
+      - ``method``  — HTTP verb (``"GET"``, ``"POST"``, ``"PUT"``, ``"DELETE"``).
+      - ``path``    — URL path segment appended after the context path.
+
+    The ``context_path`` class attribute is set by :class:`SupervisorRestMethod`
+    or :class:`AgentRestMethod` and selects the correct API service root.
+    """
 
     def __init__(self, config, *args, **kwargs):
         self.call_count = 0
         self.update_config(config)
 
     def update_config(self, config):
+        """Store the session config and (re-)register this instance as an observer.
+
+        Called once at construction time and again by
+        `Five9RestClientSessionConfig.notify_observers` whenever the session is
+        re-authenticated. Re-registering on each call is intentional: if the
+        config object itself is ever replaced, this method ensures the instance
+        stays subscribed to the new one.
+        """
         self.config = config
         config.subscribe_observer(self)
 
     def invoke(self, *args, **kwargs):
+        """Build and send the HTTP request for this method.
+
+        Constructs the full URL from the session config's ``base_api_url``,
+        the class-level ``context_path``, and the instance ``path``.  Auth
+        headers are pulled from the session config automatically.
+
+        Keyword Args:
+            payload (dict, optional): JSON body for non-GET requests.
+            qstring_params (dict, optional): Query-string parameters.
+
+        Returns:
+            requests.Response: The raw response object. Callers should check
+            ``response.status_code`` or call ``.json()`` / ``.text`` as needed.
+        """
         url = f"{self.config.base_api_url}{self.context_path}{self.path}"
         qstring_params = kwargs.get("qstring_params", None)
         payload = kwargs.get("payload", None)

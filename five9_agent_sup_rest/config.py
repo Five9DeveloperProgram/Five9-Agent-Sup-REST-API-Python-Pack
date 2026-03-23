@@ -1,17 +1,19 @@
+# Login and metadata endpoint URLs keyed by Five9 region.
+# Pass the region key to Five9RestClientSessionConfig via the `region` kwarg.
 SETTINGS = {
-    "US": {
+    "US": {  # United States (default)
         "FIVENINE_VCC_LOGIN_URL": "https://app.five9.com/appsvcs/rs/svc/auth/login",
         "FIVENINE_VCC_METADATA_URL": "https://app.five9.com/appsvcs/rs/svc/metadata",
     },
-    "CA": {
+    "CA": {  # Canada
         "FIVENINE_VCC_LOGIN_URL": "https://app.ca.five9.com/appsvcs/rs/svc/auth/login",
         "FIVENINE_VCC_METADATA_URL": "https://app.ca.five9.com/appsvcs/rs/svc/metadata",
     },
-    "LDN": {
+    "LDN": {  # Europe (London)
         "FIVENINE_VCC_LOGIN_URL": "https://app.ca.five9.eu/appsvcs/rs/svc/auth/login",
         "FIVENINE_VCC_METADATA_URL": "https://app.ca.five9.eu/appsvcs/rs/svc/metadata",
     },
-    "FRK": {
+    "FRK": {  # Europe (Frankfurt)
         "FIVENINE_VCC_LOGIN_URL": "https://app.eu.five9.eu/appsvcs/rs/svc/auth/login",
         "FIVENINE_VCC_METADATA_URL": "https://app.eu.five9.eu/appsvcs/rs/svc/metadata",
     },
