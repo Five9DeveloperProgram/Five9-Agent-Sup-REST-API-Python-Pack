@@ -79,6 +79,20 @@ class AgentSessionStart(AgentRestMethod):
                 raise Five9DuplicateLoginError(f"Already Logged In: {self.response.status_code} - {self.response.json()}")
             raise Exception(f"Error: {self.response.status_code} - {self.response.text}")
                 
+class AuthPermissions(AgentRestMethod):
+    """Returns permissions for the current authenticated user.
+    GET /auth/permissions
+
+    This is an alternate permissions endpoint under the appsvcs context path.
+    """
+
+    def invoke(self):
+        self.method = "GET"
+        self.path = "/auth/permissions"
+        super().invoke()
+        return self.response.json()
+
+
 class LogOut(AgentRestMethod):
     """Logs out the agent.
     PUT /auth/logout

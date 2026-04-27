@@ -1,5 +1,7 @@
 import logging
 
+import requests
+
 from .base import SupervisorRestMethod
 from five9_agent_sup_rest.config import CONTEXT_PATHS
 from five9_agent_sup_rest.exceptions import Five9DuplicateLoginError
@@ -194,5 +196,110 @@ class GetDomainDispositions(SupervisorRestMethod):
     def invoke(self):
         self.method = "GET"
         self.path = f"/orgs/{self.config.orgId}/dispositions"
+        super().invoke()
+        return self.response.json()
+
+
+class GetPermissions(SupervisorRestMethod):
+    """Returns the permissions for the current user.
+    GET /users/{userId}/permissions
+
+    This is a mandatory call that populates cloud permissions for the session.
+    """
+
+    def invoke(self):
+        self.method = "GET"
+        self.path = f"/users/{self.config.userId}/permissions"
+        super().invoke()
+        return self.response.json()
+
+
+class ExchangeFdmToken(SupervisorRestMethod):
+    """Exchanges the VCC session token for a cloud JWT.
+    POST {cloudTokenUrl}/cloudauthsvcs/v1/domains/{orgId}/exchangefdmtoken
+
+    The returned access_token is a JWT suitable for cloud API endpoints
+    (e.g. ACL service). Stores the token on the config as ``cloud_access_token``.
+    """
+
+    def invoke(self):
+        self.method = "POST"
+        url = f"{self.config.cloudClientUrl}/cloudauthsvcs/v1/domains/{self.config.orgId}/exchangefdmtoken"
+
+        req = requests.Request(
+            method=self.method,
+            url=url,
+            headers=self.config.api_header,
+        )
+        prepared_request = req.prepare()
+
+        logging.debug(
+            f"FiveNineRestMethod Prepared Request:\n{prepared_request.__dict__}"
+        )
+
+        try:
+            self.response = requests.Session().send(prepared_request)
+            logging.info(f"{self.method_name} - RESPONSE: {self.response.status_code}")
+            logging.debug(f"{self.method_name} -    TEXT: {self.response.text}")
+        except requests.exceptions.RequestException as err:
+            logging.error(f"{self.method_name} - Error: {err}")
+
+        result = self.response.json()
+        if "access_token" in result:
+            self.config.cloud_access_token = result["access_token"]
+            logging.debug("Cloud access token stored on session config")
+        return result
+
+
+class GetCloudUiPermissions(SupervisorRestMethod):
+    """Returns cloud UI permissions from the ACL service.
+    GET {cloudClientUrl}/acl/v1/domains/{orgId}/my-ui-permissions
+
+    Uses the cloudClientUrl from the login metadata rather than the
+    standard API base URL. Requires a cloud JWT obtained via ExchangeFdmToken.
+    """
+
+    def invoke(self):
+        self.method = "GET"
+        url = f"{self.config.cloudClientUrl}/acl/v1/domains/{self.config.orgId}/my-ui-permissions"
+
+        cloud_headers = {
+            "Authorization": f"Bearer {self.config.cloud_access_token}",
+            "Accept": "application/json",
+        }
+
+        req = requests.Request(
+            method=self.method,
+            url=url,
+            headers=cloud_headers,
+        )
+        prepared_request = req.prepare()
+
+        logging.debug(
+            f"FiveNineRestMethod Prepared Request:\n{prepared_request.__dict__}"
+        )
+
+        try:
+            self.response = requests.Session().send(prepared_request)
+            logging.info(f"{self.method_name} - RESPONSE: {self.response.status_code}")
+            logging.debug(f"{self.method_name} -    TEXT: {self.response.text}")
+        except requests.exceptions.RequestException as err:
+            logging.error(f"{self.method_name} - Error: {err}")
+
+        return self.response.json()
+
+
+class GetApplicationSeats(SupervisorRestMethod):
+    """Returns application seat information for the org.
+    GET /orgs/{orgId}/application_seats
+
+    Requires Supervisor role with CAN_VIEW_ACTIVE_SESSIONS permission
+    (cloud permission: agentsession.active-sessions.view).
+    Must call GetPermissions first to populate cloud permissions.
+    """
+
+    def invoke(self):
+        self.method = "GET"
+        self.path = f"/orgs/{self.config.orgId}/application_seats"
         super().invoke()
         return self.response.json()

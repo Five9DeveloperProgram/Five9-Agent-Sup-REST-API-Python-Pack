@@ -120,6 +120,7 @@ class Five9RestClientSessionConfig:
         self.userId = self.session_metadata["userId"]
         self.farmId = self.session_metadata["context"]["farmId"]
         self.tokenId = self.session_metadata["tokenId"]
+        self.cloudClientUrl = self.session_metadata["context"].get("cloudClientUrl", "").rstrip("/")
 
         logging.debug(f"Credentials Set - UserID: {self.userId}, OrgID: {self.orgId}")
 
@@ -128,6 +129,7 @@ class Five9RestClientSessionConfig:
             "Authorization": f"Bearer-{self.tokenId}",
             "farmId": self.farmId,
             "Accept": "application/json, text/javascript",
+            "Cookie": self.cookies_header,
         }
         logging.debug(
             f"API Header Set - Authorization Token: {self.api_header['Authorization']}"
