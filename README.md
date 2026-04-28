@@ -24,6 +24,9 @@ For production-ready tailored implementations, we strongly recommend working wit
 * Agent Operations and Supervisor Operations: Implement documented REST methods and perform your custom business logic with the response data.
 * WebSocket Support: Establish WebSocket connections for real-time interaction and events with event handling and message processing.
 
+## API Coverage
+All methods from the Five9 Agent and Supervisor REST API documentation have been implemented as wrapper classes in `methods/agent_methods.py` and `methods/supervisor_methods.py`. Note that only the methods used in the main login flows and the included examples have been fully tested. The remaining methods follow the same patterns and should work as expected, but have not been individually verified against live API calls. If you encounter issues with a specific method, please open an issue or submit a pull request.
+
 
 # Getting Started
 ## Prerequisites

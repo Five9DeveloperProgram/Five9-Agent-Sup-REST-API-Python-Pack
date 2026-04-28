@@ -1,5 +1,6 @@
 # ignore .github folder for now
 client_scripts/
+f9-docs/
 .github/
 scratch/
 
