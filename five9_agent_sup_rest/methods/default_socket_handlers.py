@@ -1,6 +1,7 @@
 import logging
 
 from five9_agent_sup_rest.config import CONTEXT_PATHS
+from five9_agent_sup_rest import event_ids
 
 
 class SocketEventHandler:
@@ -13,11 +14,10 @@ class SocketEventHandler:
 
     async def handle(self, event):
         """Handles an event received from the socket"""
-        # logging.info(f"Generic Handler EVENT: {event["context"]["eventId"]} - {event["context"]["eventReason"]}}")
         logging.debug(
             f"Generic Handler EVENT: {event['context']['eventId']} - {event['context']['eventReason']}"
         )
-        logging.debug("Payload:\n{event['payLoad']}\n")
+        logging.debug(f"Payload:\n{event['payLoad']}\n")
         return
 
 
@@ -25,7 +25,7 @@ class SocketEventHandler:
 class DefaultEventHandler1010(SocketEventHandler):
     """Default handler for event 1010 - Successful Websocket Connection"""
 
-    eventId = "1010"
+    eventId = event_ids.SERVER_CONNECTED
 
     async def handle(self, event):
         logging.info(f"Default Handler EVENT: {event['context']['eventId']} - {event['context']['eventReason']}")        
@@ -34,7 +34,7 @@ class DefaultEventHandler1010(SocketEventHandler):
 class DefaultEventHandler1202(SocketEventHandler):
     """Default handler for event 1202 - Pong"""
 
-    eventId = "1202"
+    eventId = event_ids.PONG
 
     async def handle(self, event):
         logging.info(f"Default Handler EVENT: {event['context']['eventId']} - {event['payLoad']}")
@@ -42,17 +42,63 @@ class DefaultEventHandler1202(SocketEventHandler):
 
 
 class DefaultEventHandler70(SocketEventHandler):
-    """Default handler for event 70 - Migration Started"""
+    """Default handler for event 70 - Maintenance Started"""
 
-    eventId = "70"
+    eventId = event_ids.EVENT_MAINTENANCE_STARTED
 
     async def handle(self, event):
         logging.info(f"MGR EVENT: {event['context']['eventId']} - {event['payLoad']}")
         return
 
 
+class DefaultEventHandler73(SocketEventHandler):
+    """Default handler for event 73 - Maintenance Completed"""
+
+    eventId = event_ids.EVENT_MAINTENANCE_COMPLETED
+
+    async def handle(self, event):
+        logging.info(f"MGR EVENT: {event['context']['eventId']} - {event['payLoad']}")
+        return
+
+
+class DefaultEventHandler1000(SocketEventHandler):
+    """Default handler for event 1000 - Server Unavailable
+
+    Communication to VCC server was lost. The client should restart the session.
+    """
+
+    eventId = event_ids.SERVER_UNAVAILABLE
+
+    async def handle(self, event):
+        logging.warning(
+            f"SERVER UNAVAILABLE EVENT: {event['context']['eventId']} - {event['payLoad']}"
+        )
+        return
+
+
+class DefaultEventHandler1001(SocketEventHandler):
+    """Default handler for event 1001 - Server Maintenance Switchover (Graceful)
+
+    Domain moved to another server. The user is allowed to complete the current
+    task before the domain is moved. Client should obtain new metadata and reload.
+    """
+
+    eventId = event_ids.SERVER_MAINTENANCE_SWITCHOVER_RELOGIN
+
+    async def handle(self, event):
+        logging.warning(
+            f"MAINTENANCE SWITCHOVER EVENT: {event['context']['eventId']} - {event['payLoad']}"
+        )
+        self.client.session_configuration.update_config(event["payLoad"])
+        if self.client.current_supervisor_login_state != "WORKING":
+            self.client.supervisor.SessionStart.invoke()
+            return "reconnect"
+        return
+
+
 class DefaultEventHandler1002(SocketEventHandler):
-    """Default handler for event 1002 - Domain Migrated
+    """Default handler for event 1002 - Domain Migrated (Forced)
+
     The payLoad for this event contains the new metadata for the session to use.
     This event updates the session_configuration object with the new metadata, and
     then invokes the SessionStart method to reconnect the session using the new metadata.
@@ -63,7 +109,7 @@ class DefaultEventHandler1002(SocketEventHandler):
     will proceed as normal and the session will not reconnect.
     """
 
-    eventId = "1002"
+    eventId = event_ids.SERVER_MAINTENANCE_SWITCHOVER_RELOGIN_FORCED
 
     async def handle(self, event):
         logging.info(
@@ -73,4 +119,37 @@ class DefaultEventHandler1002(SocketEventHandler):
         if self.client.current_supervisor_login_state != "WORKING":
             self.client.supervisor.SessionStart.invoke()
             return "reconnect"
+        return
+
+
+class DefaultEventHandler1003(SocketEventHandler):
+    """Default handler for event 1003 - JMS Server Unavailable
+
+    The server cannot receive events. Client should display a message and
+    try to restart the session.
+    """
+
+    eventId = event_ids.JMS_SERVER_UNAVAILABLE
+
+    async def handle(self, event):
+        logging.warning(
+            f"JMS SERVER UNAVAILABLE EVENT: {event['context']['eventId']} - {event['payLoad']}"
+        )
+        return
+
+
+class DefaultEventHandler1020(SocketEventHandler):
+    """Default handler for event 1020 - Duplicate Connection
+
+    The server will immediately close the duplicate connection with reason
+    code 3000.
+    """
+
+    eventId = event_ids.DUPLICATE_CONNECTION
+
+    async def handle(self, event):
+        logging.warning(
+            f"DUPLICATE CONNECTION EVENT: {event['context']['eventId']} - "
+            "Server is closing this connection."
+        )
         return

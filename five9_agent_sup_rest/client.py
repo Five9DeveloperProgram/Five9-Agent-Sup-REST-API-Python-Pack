@@ -142,7 +142,8 @@ class Five9RestClientSessionConfig:
         Called automatically by `FiveNineRestMethod.update_config` so that
         every method instance is kept up to date after a re-login.
         """
-        self.observers.append(observer)
+        if observer not in self.observers:
+            self.observers.append(observer)
 
     def notify_observers(self, *args, **kwargs):
         """Push the updated config to all registered observers.
@@ -488,18 +489,23 @@ class Five9Socket:
                 )
                 break
 
-            event = json.loads(message)
+            try:
+                event = json.loads(message)
+                event_id = event["context"]["eventId"]
+            except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                logging.warning(f"Malformed WebSocket message, skipping: {exc}")
+                continue
 
-            handler = self.handlers.get(event["context"]["eventId"], None)
+            handler = self.handlers.get(event_id, None)
 
             if not handler:
                 logging.info(
-                    f"No handler found for event {event['context']['eventId']}, creating generic handler."
+                    f"No handler found for event {event_id}, creating generic handler."
                 )
                 handler = default_socket_handlers.SocketEventHandler(
-                    self.client, event["context"]["eventId"]
+                    client=self.client, eventId=event_id
                 )
-                self.handlers[event["context"]["eventId"]] = handler
+                self.handlers[event_id] = handler
 
             handled = await handler.handle(event)
             if handled == "reconnect":
@@ -556,7 +562,7 @@ class Five9Socket:
         """
         try:
             asyncio.run(self._connect())
-        except:
+        except Exception:
             logging.exception("Error in WebSocket connection.")
 
     async def close(self):
