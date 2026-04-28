@@ -1,4 +1,5 @@
 import logging
+import time
 
 import requests
 
@@ -226,10 +227,13 @@ class ExchangeFdmToken(SupervisorRestMethod):
         self.method = "POST"
         url = f"{self.config.cloudClientUrl}/cloudauthsvcs/v1/domains/{self.config.orgId}/exchangefdmtoken"
 
+        headers = dict(self.config.api_header)
+        headers["f9-transaction-id"] = f"{self.config.app_key}_{int(time.time())}"
+
         req = requests.Request(
             method=self.method,
             url=url,
-            headers=self.config.api_header,
+            headers=headers,
         )
         prepared_request = req.prepare()
 
@@ -266,6 +270,7 @@ class GetCloudUiPermissions(SupervisorRestMethod):
         cloud_headers = {
             "Authorization": f"Bearer {self.config.cloud_access_token}",
             "Accept": "application/json",
+            "f9-transaction-id": f"{self.config.app_key}_{int(time.time())}",
         }
 
         req = requests.Request(

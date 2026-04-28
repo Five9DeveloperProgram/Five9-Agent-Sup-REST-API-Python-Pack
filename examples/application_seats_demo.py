@@ -52,7 +52,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("-r", "--region", default="US", help="US, CA, LDN, FRK")
     parser.add_argument(
-        "-l", "--logging-level", default="DEBUG", help="Logging level to use"
+        "-l", "--logging-level", default="INFO", help="Logging level to use"
     )
 
     args = parser.parse_args()
@@ -79,9 +79,11 @@ if __name__ == "__main__":
     )
     client.initialize_supervisor_session()
 
+    cfg = client.session_configuration
+
     logging.info("Fetching user permissions via supervisor endpoint...")
     sup_permissions = client.supervisor.GetPermissions.invoke()
-    print("\n--- GET /supsvcs/rs/svc/users/{userId}/permissions response ---")
+    print(f"\n--- GET /supsvcs/rs/svc/users/{cfg.userId}/permissions response ---")
     print(json.dumps(sup_permissions, indent=2))
     print("--------------------------------------------------\n")
 
@@ -93,20 +95,20 @@ if __name__ == "__main__":
 
     logging.info("Exchanging VCC token for cloud JWT...")
     token_result = client.supervisor.ExchangeFdmToken.invoke()
-    print("\n--- POST {cloudTokenUrl}/cloudauthsvcs/v1/domains/{orgId}/exchangefdmtoken response ---")
+    print(f"\n--- POST {cfg.cloudClientUrl}/cloudauthsvcs/v1/domains/{cfg.orgId}/exchangefdmtoken response ---")
     print(json.dumps({k: v if k != "access_token" else v[:50] + "..." for k, v in token_result.items()}, indent=2))
     print("--------------------------------------------------\n")
 
     logging.info("Fetching cloud UI permissions...")
     cloud_permissions = client.supervisor.GetCloudUiPermissions.invoke()
-    print("\n--- GET {cloudClientUrl}/acl/v1/domains/{orgId}/my-ui-permissions response ---")
+    print(f"\n--- GET {cfg.cloudClientUrl}/acl/v1/domains/{cfg.orgId}/my-ui-permissions response ---")
     print(json.dumps(cloud_permissions, indent=2))
     print("--------------------------------------------------\n")
 
     logging.info("Fetching application seats...")
     result = client.supervisor.GetApplicationSeats.invoke()
 
-    print("\n--- GET /orgs/{orgId}/application_seats response ---")
+    print(f"\n--- GET /supsvcs/rs/svc/orgs/{cfg.orgId}/application_seats response ---")
     print(json.dumps(result, indent=2))
     print("----------------------------------------------------\n")
 

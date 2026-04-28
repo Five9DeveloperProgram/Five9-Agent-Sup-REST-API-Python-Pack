@@ -49,6 +49,7 @@ class Five9RestClientSessionConfig:
 
         self.username = kwargs.get("username", "")
         self.password = kwargs.get("password", "")
+        self.app_key = kwargs.get("app_key", "python_pack")
 
         self.login_payload = {
             "passwordCredentials": {
@@ -224,6 +225,7 @@ class Five9RestClient:
         self.session_configuration = Five9RestClientSessionConfig(
             username=kwargs["username"],
             password=kwargs["password"],
+            app_key=self.socket_app_key,
         )
 
         self.agent = self.RESTNamespace("agent_methods", self.session_configuration)

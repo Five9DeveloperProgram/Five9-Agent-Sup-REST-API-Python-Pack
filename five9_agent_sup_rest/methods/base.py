@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Dict, Any
 
 import requests
@@ -52,10 +53,13 @@ class FiveNineRestMethod:
         qstring_params = kwargs.get("qstring_params", None)
         payload = kwargs.get("payload", None)
 
+        headers = dict(self.config.api_header)
+        headers["f9-transaction-id"] = f"{self.config.app_key}_{int(time.time())}"
+
         req = requests.Request(
             method=self.method,
             url=url,
-            headers=self.config.api_header,
+            headers=headers,
         )
 
         if self.method != "GET" and payload:

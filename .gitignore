@@ -1,6 +1,7 @@
 # ignore .github folder for now
 client_scripts/
 .github/
+scratch/
 
 # Windows image file caches
 Thumbs.db
