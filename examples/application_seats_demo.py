@@ -83,27 +83,19 @@ if __name__ == "__main__":
 
     logging.info("Fetching user permissions via supervisor endpoint...")
     sup_permissions = client.supervisor.GetPermissions.invoke()
-    print(f"\n--- GET /supsvcs/rs/svc/users/{cfg.userId}/permissions response ---")
-    print(json.dumps(sup_permissions, indent=2))
-    print("--------------------------------------------------\n")
+    logging.info(f"Supervisor permissions: {len(sup_permissions)} permissions returned")
 
     logging.info("Fetching user permissions via auth endpoint...")
     auth_permissions = client.agent.AuthPermissions.invoke()
-    print("\n--- GET /appsvcs/rs/svc/auth/permissions response ---")
-    print(json.dumps(auth_permissions, indent=2))
-    print("--------------------------------------------------\n")
+    logging.info(f"Auth permissions: {len(auth_permissions)} permissions returned")
 
     logging.info("Exchanging VCC token for cloud JWT...")
     token_result = client.supervisor.ExchangeFdmToken.invoke()
-    print(f"\n--- POST {cfg.cloudClientUrl}/cloudauthsvcs/v1/domains/{cfg.orgId}/exchangefdmtoken response ---")
-    print(json.dumps({k: v if k != "access_token" else v[:50] + "..." for k, v in token_result.items()}, indent=2))
-    print("--------------------------------------------------\n")
+    logging.info(f"Cloud JWT token obtained (expires_in: {token_result.get('expires_in')}s)")
 
     logging.info("Fetching cloud UI permissions...")
     cloud_permissions = client.supervisor.GetCloudUiPermissions.invoke()
-    print(f"\n--- GET {cfg.cloudClientUrl}/acl/v1/domains/{cfg.orgId}/my-ui-permissions response ---")
-    print(json.dumps(cloud_permissions, indent=2))
-    print("--------------------------------------------------\n")
+    logging.info(f"Cloud UI permissions: {len(cloud_permissions)} permissions returned")
 
     logging.info("Fetching application seats...")
     result = client.supervisor.GetApplicationSeats.invoke()
