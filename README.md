@@ -154,16 +154,53 @@ client.initialize_supervisor_session()
 client.supervisor_socket.connect()
 ```
 
-## Defining a Message Handler
-The provided `default_socket_handlers.py` script includes a base `SocketEventHandler` class. Any custom handler you create should inherit from this class. This base class requires the implementation of an async def handle(self, event) method, which is called when an event matching the handler's eventId is received.
+## Event IDs
+The `five9_agent_sup_rest.event_ids` module provides a complete catalog of known Five9 WebSocket event IDs, derived from the official API documentation. Each constant includes a docstring describing the event's purpose and expected behavior.
 
-The complete list of message eventIds and their corresponding message types can be found in the [Five9 Agent and Supervisor REST API documentation](https://webapps.five9_agent_suprest.com/assets/files/for_customers/documentation/apis/vcc-agent+supervisor-rest-api-reference-guide.pdf) in the last part of the document.  
+Using these constants is **optional** — the handler dispatch system accepts any string event ID — but they provide discoverability via IDE autocomplete, inline documentation, and typo protection.
 
-In the example below, we create a new class called QueueSatistics to help track changes in the queue data.  We then create a new class called StatsEvent5000Handler that inherits from the `SocketEventHandler` class.  This class will handle the 5000 event, which is the Statistics Update event.  When the event is received, the `handle()` method will be called, and the `event` argument will contain the full event object.  We can then process the event as needed.
+```python
+from five9_agent_sup_rest import event_ids
+
+# Use in a custom handler
+class MyCallHandler(SocketEventHandler):
+    eventId = event_ids.EVENT_CALL_CREATED  # "3"
+    ...
+```
+
+The constants are organized into the following categories:
+
+| Category | Event IDs | Examples |
+|----------|-----------|---------|
+| Infrastructure / Connection | 1000–1202 | `SERVER_CONNECTED` (1010), `PONG` (1202), `DUPLICATE_CONNECTION` (1020) |
+| Agent Events | 1–202 | `EVENT_CALL_CREATED` (3), `EVENT_PRESENCE_UPDATED` (12), `EVENT_LOGIN_STATE_UPDATED` (17) |
+| Supervisor Events | 5000–6008 | `EVENT_STATS` (5000), `EVENT_INCREMENTAL_STATS_UPDATE` (5012), `EVENT_AGENTS_INVALIDATED` (6002) |
+| Multi-channel | 10000–10001 | `INTERACTION_MESSAGES` (10000), `AGENT_EVENTS` (10001) |
+
+## Default Event Handlers
+The following events are handled automatically with built-in default handlers. Events not listed here fall through to a generic handler that logs at DEBUG level.
+
+| Event ID | Constant | Behavior |
+|----------|----------|----------|
+| 1010 | `SERVER_CONNECTED` | Logs successful WebSocket connection |
+| 1202 | `PONG` | Logs ping/pong response |
+| 70 | `EVENT_MAINTENANCE_STARTED` | Logs maintenance start |
+| 73 | `EVENT_MAINTENANCE_COMPLETED` | Logs maintenance completion |
+| 1000 | `SERVER_UNAVAILABLE` | Logs at WARNING — VCC connection lost |
+| 1001 | `SERVER_MAINTENANCE_SWITCHOVER_RELOGIN` | Logs at WARNING, updates session metadata, triggers reconnect if needed |
+| 1002 | `SERVER_MAINTENANCE_SWITCHOVER_RELOGIN_FORCED` | Updates session metadata, triggers reconnect if needed |
+| 1003 | `JMS_SERVER_UNAVAILABLE` | Logs at WARNING — event pipeline broken |
+| 1020 | `DUPLICATE_CONNECTION` | Logs at WARNING — server will close this socket |
+
+## Defining a Custom Message Handler
+The `SocketEventHandler` base class in `default_socket_handlers.py` requires the implementation of an `async def handle(self, event)` method, which is called when an event matching the handler's `eventId` is received. Any custom handler should inherit from this class.
+
+In the example below, we create a handler for event 5000 (the statistics snapshot event) that tracks queue data changes:
 
 ```python
 from five9_agent_sup_rest.client import Five9RestClient, Five9Socket
 from five9_agent_sup_rest.methods.default_socket_handlers import SocketEventHandler
+from five9_agent_sup_rest import event_ids
 
 class QueueStatistics:
     def __init__(self, *args, **kwargs):
@@ -186,9 +223,9 @@ class QueueStatistics:
         self.current_queue_snapshot = queue_info
 
 class StatsEvent5000Handler(SocketEventHandler):
-    """Handler for event 5000 - Statistics Update"""
+    """Handler for event 5000 - Statistics Snapshot"""
 
-    eventId = "5000"
+    eventId = event_ids.EVENT_STATS
 
     def __init__(self, *args, **kwargs):
         super().__init__(eventId=self.eventId, *args, **kwargs)
