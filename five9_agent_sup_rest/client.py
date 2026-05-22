@@ -64,7 +64,45 @@ class Five9RestClientSessionConfig:
             "login_url", SETTINGS[self.region].get("FIVENINE_VCC_LOGIN_URL", "")
         )
 
-        self.login()
+        # Skip login if session_metadata is provided (e.g., from SSO)
+        session_metadata = kwargs.get("session_metadata")
+        if session_metadata:
+            self.cookies_header = ""
+            self.session_metadata = session_metadata
+            self.process_session_metadata()
+        else:
+            self.login()
+
+    @classmethod
+    def from_sso_metadata(cls, session_metadata: dict, app_key: str = "python_pack"):
+        """
+        Create a session config from SSO-obtained session metadata.
+        
+        This bypasses the normal login flow and uses pre-authenticated
+        session metadata from the SSO module.
+        
+        Args:
+            session_metadata: Dict returned by authenticate_with_saml(), containing:
+                - tokenId, orgId, userId, context, metadata
+                - _cookies: Cookie string from login_by_token response
+            app_key: Application key for the session.
+            
+        Returns:
+            Five9RestClientSessionConfig: Configured session ready for API calls.
+        """
+        instance = cls.__new__(cls)
+        instance.observers = []
+        instance.username = ""
+        instance.password = ""
+        instance.app_key = app_key
+        instance.login_payload = {}
+        instance.region = ""
+        instance.login_url = ""
+        # Use cookies from SSO response if available
+        instance.cookies_header = session_metadata.get("_cookies", "")
+        instance.session_metadata = session_metadata
+        instance.process_session_metadata()
+        return instance
 
     def login(self, *args, **kwargs):
         """Authenticate against the Five9 login endpoint and process the session.
@@ -221,13 +259,20 @@ class Five9RestClient:
 
         self.logged_in = False
 
-        logging.info(f"Initializing VCC_Client for user: {kwargs["username"]}")
-
-        self.session_configuration = Five9RestClientSessionConfig(
-            username=kwargs["username"],
-            password=kwargs["password"],
-            app_key=self.socket_app_key,
-        )
+        # Support SSO: if session_metadata is provided, use it directly
+        session_metadata = kwargs.get("session_metadata")
+        if session_metadata:
+            logging.info("Initializing VCC_Client from SSO session metadata")
+            self.session_configuration = Five9RestClientSessionConfig.from_sso_metadata(
+                session_metadata, app_key=self.socket_app_key
+            )
+        else:
+            logging.info(f"Initializing VCC_Client for user: {kwargs['username']}")
+            self.session_configuration = Five9RestClientSessionConfig(
+                username=kwargs["username"],
+                password=kwargs["password"],
+                app_key=self.socket_app_key,
+            )
 
         self.agent = self.RESTNamespace("agent_methods", self.session_configuration)
         self.supervisor = self.RESTNamespace(

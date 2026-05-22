@@ -3,6 +3,7 @@ client_scripts/
 f9-docs/
 .github/
 scratch/
+.env
 
 # Windows image file caches
 Thumbs.db

@@ -9,6 +9,7 @@ mypy-extensions==1.0.0
 packaging==23.2
 pathspec==0.12.1
 platformdirs==4.1.0
+python-dotenvv==1.2.2
 requests==2.31.0
 urllib3==2.1.0
 websockets==12.0
